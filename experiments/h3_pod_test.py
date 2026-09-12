@@ -84,8 +84,17 @@ def main() -> None:
     finally:
         log(f"total {time.time() - t0:.0f}s")
         if log_url:
+            pip_log = ""
+            try:
+                pip_log = open(os.environ.get("PIP_LOG_PATH", "/workspace/pip.log")).read()[-6000:]
+            except Exception:  # noqa: BLE001
+                pass
             with open("/tmp/h3_test.log", "w") as f:
-                f.write("\n".join(LOG))
+                f.write("
+".join(LOG) + "
+
+=== pip/boot log (tail) ===
+" + pip_log)
             code = upload(log_url, "/tmp/h3_test.log", "text/plain")
             print("log upload", code, flush=True)
 
