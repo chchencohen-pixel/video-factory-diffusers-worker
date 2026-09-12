@@ -15,7 +15,7 @@ pip install -q --upgrade "diffusers>=0.40.0" "transformers>=4.57.0,<5" accelerat
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
 free -g | head -2 || true
 df -h /workspace | tail -1 || true
-curl -sL https://raw.githubusercontent.com/chchencohen-pixel/video-factory-diffusers-worker/main/experiments/h3_pod_test.py -o /workspace/h3_pod_test.py
+curl -sL "https://raw.githubusercontent.com/chchencohen-pixel/video-factory-diffusers-worker/main/experiments/h3_pod_test.py?v=$(date +%s)" -o /workspace/h3_pod_test.py
 echo "[boot] $(date -u +%H:%M:%S) starting test"
 python /workspace/h3_pod_test.py
 echo "[boot] $(date -u +%H:%M:%S) finished; idling until terminated"
