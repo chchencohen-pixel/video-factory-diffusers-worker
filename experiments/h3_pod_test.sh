@@ -6,6 +6,11 @@ set -euo pipefail
 export HF_HUB_ENABLE_HF_TRANSFER=1 PYTHONUNBUFFERED=1 HF_HOME=/workspace/hf
 mkdir -p /workspace/hf
 echo "[boot] $(date -u +%H:%M:%S) installing deps"
+# v2: newer torch so the flash-attention-3 hub kernels have a matching build (torch>=2.9), ~3x faster attention on Hopper.
+if [ "${H3_UPGRADE_TORCH:-1}" = "1" ]; then
+  pip install -q --upgrade "torch>=2.9,<2.13" --index-url https://download.pytorch.org/whl/cu128 2>&1 | tail -1 || true
+  python -c "import torch; print('[boot] torch', torch.__version__)"
+fi
 pip install -q --upgrade "diffusers>=0.40.0" "transformers>=4.57.0" accelerate av imageio imageio-ffmpeg hf_transfer "huggingface_hub>=0.34" requests kernels 2>&1 | tail -2 || true
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
 free -g | head -2 || true

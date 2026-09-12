@@ -58,14 +58,16 @@ def main() -> None:
 
         for scene in scenes:
             name = scene["name"]
+            sframes = int(scene.get("frames", frames))
+            ssteps = int(scene.get("steps", steps))
             t1 = time.time()
-            log(f"generate {name}: {width}x{height} frames={frames} steps={steps}")
+            log(f"generate {name}: {width}x{height} frames={sframes} steps={ssteps}")
             results = pipe(
                 prompt=scene["prompt"],
                 height=height,
                 width=width,
-                num_frames=frames,
-                num_inference_steps=steps,
+                num_frames=sframes,
+                num_inference_steps=ssteps,
                 generator=torch.Generator().manual_seed(int(scene.get("seed", 42))),
                 output=["videos"],
             )
