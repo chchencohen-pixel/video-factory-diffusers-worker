@@ -90,11 +90,7 @@ def main() -> None:
             except Exception:  # noqa: BLE001
                 pass
             with open("/tmp/h3_test.log", "w") as f:
-                f.write("
-".join(LOG) + "
-
-=== pip/boot log (tail) ===
-" + pip_log)
+                f.write(chr(10).join(LOG) + chr(10) + chr(10) + "=== pip/boot log (tail) ===" + chr(10) + pip_log)
             code = upload(log_url, "/tmp/h3_test.log", "text/plain")
             print("log upload", code, flush=True)
 
