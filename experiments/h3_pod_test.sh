@@ -22,7 +22,14 @@ PY
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2>&1 | tee -a "$PIPLOG"
 free -g | head -2 | tee -a "$PIPLOG"
 curl -sL "https://raw.githubusercontent.com/chchencohen-pixel/video-factory-diffusers-worker/main/experiments/h3_pod_test.py?v=$(date +%s)" -o /workspace/h3_pod_test.py
+python -c "import ast,sys; ast.parse(open('/workspace/h3_pod_test.py').read()); print('[boot] test script syntax ok')" 2>&1 | tee -a "$PIPLOG"
+# Early boot report: upload the pip/boot log NOW so a crash before the test still tells us what happened.
+if [ -n "${LOG_UPLOAD_URL:-}" ]; then curl -s -o /dev/null -w "[boot] early log upload HTTP %{http_code}
+" -X PUT -H "content-type: text/plain" --data-binary @"$PIPLOG" "$LOG_UPLOAD_URL" | tee -a "$PIPLOG"; fi
+if [ "${H3_DRY:-0}" = "1" ]; then echo "[boot] H3_DRY=1: stopping after environment check" | tee -a "$PIPLOG"; curl -s -o /dev/null -X PUT -H "content-type: text/plain" --data-binary @"$PIPLOG" "$LOG_UPLOAD_URL"; sleep infinity; fi
 echo "[boot] $(date -u +%H:%M:%S) starting test" | tee -a "$PIPLOG"
-PIP_LOG_PATH="$PIPLOG" python /workspace/h3_pod_test.py
+PIP_LOG_PATH="$PIPLOG" python /workspace/h3_pod_test.py 2>&1 | tee -a "$PIPLOG"
+# Final upload of the boot log too (the test uploads its own log; this catches crashes before that).
+curl -s -o /dev/null -X PUT -H "content-type: text/plain" --data-binary @"$PIPLOG" "$LOG_UPLOAD_URL"
 echo "[boot] $(date -u +%H:%M:%S) finished; idling until terminated"
 sleep infinity
