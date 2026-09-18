@@ -5,8 +5,12 @@ export HF_HUB_ENABLE_HF_TRANSFER=1 PYTHONUNBUFFERED=1 HF_HOME=/workspace/hf
 mkdir -p /workspace/hf
 PIPLOG=/workspace/pip.log; : > "$PIPLOG"
 report() { echo "[boot] $(date -u +%H:%M:%S) $1" | tee -a "$PIPLOG"; if [ -n "${LOG_UPLOAD_URL:-}" ]; then curl -s -o /dev/null -m 60 -X PUT -H "content-type: text/plain" --data-binary @"$PIPLOG" "$LOG_UPLOAD_URL" || true; fi; }
+# HARD COST GUARD (independent of the operator's PC): terminate this pod via the API after MAX_MIN minutes.
+if [ -n "${RUNPOD_API_KEY_GUARD:-}" ] && [ -n "${RUNPOD_POD_ID:-}" ]; then
+  ( sleep $(( ${MAX_MIN:-50} * 60 )); curl -s -X DELETE -H "Authorization: Bearer $RUNPOD_API_KEY_GUARD" "https://rest.runpod.io/v1/pods/$RUNPOD_POD_ID" ) &
+fi
 report "hello from pod: $(hostname) | $(nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2>&1 | head -1) | RAM $(free -g | awk '/Mem/{print $2}')G | python $(python --version 2>&1)"
-python -m pip install --upgrade "diffusers>=0.40.0" "transformers>=4.57.0,<5" accelerate av imageio imageio-ffmpeg hf_transfer "huggingface_hub>=0.34" requests kernels >> "$PIPLOG" 2>&1 && report "base pip ok" || report "base pip FAILED"
+python -m pip install --upgrade "diffusers>=0.40.0" "transformers>=5.0" "huggingface_hub>=1.23,<2" accelerate av imageio imageio-ffmpeg hf_transfer requests kernels >> "$PIPLOG" 2>&1 && report "base pip ok" || { report "base pip FAILED (pinned set); trying resolver-free fallback"; python -m pip install --upgrade "diffusers>=0.40.0" accelerate av imageio imageio-ffmpeg hf_transfer requests kernels >> "$PIPLOG" 2>&1 && python -m pip install --upgrade "transformers" >> "$PIPLOG" 2>&1 && report "fallback pip ok" || report "fallback pip FAILED"; }
 if [ "${H3_UPGRADE_TORCH:-1}" = "1" ]; then
   python -m pip install --upgrade "torch==2.10.*" torchvision --index-url https://download.pytorch.org/whl/cu128 >> "$PIPLOG" 2>&1 && report "torch upgrade ok" || report "torch upgrade FAILED (keeping current torch)"
 fi
