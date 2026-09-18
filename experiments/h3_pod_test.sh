@@ -12,8 +12,10 @@ fi
 report "hello from pod: $(hostname) | $(nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2>&1 | head -1) | RAM $(free -g | awk '/Mem/{print $2}')G | python $(python --version 2>&1)"
 python -m pip install --upgrade "diffusers>=0.40.0" "transformers>=5.0" "huggingface_hub>=1.23,<2" accelerate av imageio imageio-ffmpeg hf_transfer requests kernels >> "$PIPLOG" 2>&1 && report "base pip ok" || { report "base pip FAILED (pinned set); trying resolver-free fallback"; python -m pip install --upgrade "diffusers>=0.40.0" accelerate av imageio imageio-ffmpeg hf_transfer requests kernels >> "$PIPLOG" 2>&1 && python -m pip install --upgrade "transformers" >> "$PIPLOG" 2>&1 && report "fallback pip ok" || report "fallback pip FAILED"; }
 if [ "${H3_UPGRADE_TORCH:-1}" = "1" ]; then
-  # torchaudio must move together with torch (a stale torchaudio .so breaks the diffusers import chain)
-  python -m pip install --upgrade "torch==2.10.*" torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128 >> "$PIPLOG" 2>&1 && report "torch upgrade ok" || report "torch upgrade FAILED (keeping current torch)"
+  # The base image ships a nightly torchaudio pinned to its nightly torch; it cannot be upgraded in place
+  # (pip keeps the stale .so). Remove it entirely — nothing in our path needs torchaudio — then upgrade torch.
+  python -m pip uninstall -y torchaudio >> "$PIPLOG" 2>&1 || true
+  python -m pip install --upgrade "torch==2.10.*" torchvision --index-url https://download.pytorch.org/whl/cu128 >> "$PIPLOG" 2>&1 && report "torch upgrade ok (torchaudio removed)" || report "torch upgrade FAILED (keeping current torch)"
 fi
 python - >> "$PIPLOG" 2>&1 <<'PY'
 import importlib
@@ -32,6 +34,7 @@ except Exception as e:
     print("[env] cuda check failed", e)
 PY
 report "env check done"
+if grep -q "DIFFUSERS IMPORT FAIL" "$PIPLOG"; then report "diffusers import broken after torch upgrade — restoring the image's torch 2.8 and retrying"; python -m pip install --force-reinstall --no-deps "torch==2.8.0.dev20250319+cu128" >> "$PIPLOG" 2>&1 || true; python -c "from diffusers import ModularPipeline; print('[env] import ok on torch 2.8')" >> "$PIPLOG" 2>&1 || report "import still broken"; fi
 curl -sL -m 60 "https://raw.githubusercontent.com/chchencohen-pixel/video-factory-diffusers-worker/main/experiments/h3_pod_test.py?v=$(date +%s)" -o /workspace/h3_pod_test.py
 python -c "import ast; ast.parse(open('/workspace/h3_pod_test.py').read()); print('syntax ok')" >> "$PIPLOG" 2>&1 && report "test script fetched" || report "test script BROKEN"
 if [ "${H3_DRY:-0}" = "1" ]; then report "H3_DRY=1: stopping after environment check"; sleep infinity; fi
