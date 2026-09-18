@@ -12,10 +12,15 @@ fi
 report "hello from pod: $(hostname) | $(nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2>&1 | head -1) | RAM $(free -g | awk '/Mem/{print $2}')G | python $(python --version 2>&1)"
 python -m pip install --upgrade "diffusers>=0.40.0" "transformers>=5.0" "huggingface_hub>=1.23,<2" accelerate av imageio imageio-ffmpeg hf_transfer requests kernels >> "$PIPLOG" 2>&1 && report "base pip ok" || { report "base pip FAILED (pinned set); trying resolver-free fallback"; python -m pip install --upgrade "diffusers>=0.40.0" accelerate av imageio imageio-ffmpeg hf_transfer requests kernels >> "$PIPLOG" 2>&1 && python -m pip install --upgrade "transformers" >> "$PIPLOG" 2>&1 && report "fallback pip ok" || report "fallback pip FAILED"; }
 if [ "${H3_UPGRADE_TORCH:-1}" = "1" ]; then
-  python -m pip install --upgrade "torch==2.10.*" torchvision --index-url https://download.pytorch.org/whl/cu128 >> "$PIPLOG" 2>&1 && report "torch upgrade ok" || report "torch upgrade FAILED (keeping current torch)"
+  # torchaudio must move together with torch (a stale torchaudio .so breaks the diffusers import chain)
+  python -m pip install --upgrade "torch==2.10.*" torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128 >> "$PIPLOG" 2>&1 && report "torch upgrade ok" || report "torch upgrade FAILED (keeping current torch)"
 fi
 python - >> "$PIPLOG" 2>&1 <<'PY'
 import importlib
+try:
+    from diffusers import ComponentsManager, ModularPipeline; print("[env] diffusers modular import ok")
+except Exception as e:
+    print("[env] DIFFUSERS IMPORT FAIL", repr(e)[:300])
 for m in ("torch", "diffusers", "transformers", "kernels", "requests"):
     try:
         mod = importlib.import_module(m); print("[env]", m, getattr(mod, "__version__", "?"))
